@@ -133,8 +133,13 @@ int main(int argc, char** argv) {
         c->layout()->setContentsMargins(0, 0, 0, 0);
         rptr<QLineSeries> s1 = new QLineSeries();
         rptr<QLineSeries> s2 = new QLineSeries();
+        QColor bgColor = c->palette().color(QPalette::Background);
         s1->setPen(QPen{QBrush{QColor{0, 0, 255, 255}}, 2});
         s2->setPen(QPen{QBrush{QColor{255, 0, 0, 255}}, 2});
+        if (bgColor.toHsv().value() < 155) {
+            s1->setPen(QPen{QBrush{QColor{0, 230, 255, 255}}, 2});
+            s2->setPen(QPen{QBrush{QColor{255, 70, 70, 255}}, 2});
+        }
         c->legend()->hide();
         c->addSeries(s1.get());
         c->addSeries(s2.get());
@@ -142,15 +147,33 @@ int main(int argc, char** argv) {
         QFont font = c->titleFont();
         font.setBold(true);
         font.setPointSizeF(font.pointSizeF() * 10 / 9);
+        QColor fgColor = c->palette().color(QPalette::Foreground);
+        QColor gridColor = c->palette().color(QPalette::ColorGroup::Disabled, QPalette::Foreground);
+        c->setTitleBrush(QBrush{fgColor});
+        // c->palette().color(QPalette::WindowText);
         c->setTitleFont(font);
         c->setTitle(name.c_str());
         c->axisX()->setLabelsVisible(false);
         c->axisY()->setTitleText("MB/s");
         font = c->axisY()->titleFont();
         font.setPointSizeF(font.pointSizeF() * 4 / 5);
+        c->axisY()->setTitleBrush(QBrush{fgColor});
         c->axisY()->setTitleFont(font);
         c->axisX()->setRange(0, 100);
         c->axisY()->setRange(0, 100);
+
+        c->axisY()->setGridLineColor(gridColor);
+        c->axisX()->setGridLineColor(gridColor);
+        c->axisX()->setLabelsColor(fgColor);
+        c->axisY()->setLabelsColor(fgColor);
+        c->axisX()->setShadesColor(gridColor);
+        c->axisY()->setShadesColor(gridColor);
+        c->axisX()->setMinorGridLineColor(gridColor);
+        c->axisY()->setMinorGridLineColor(gridColor);
+        c->axisX()->setShadesBorderColor(gridColor);
+        c->axisY()->setShadesBorderColor(gridColor);
+        c->axisX()->setLinePenColor(gridColor);
+        c->axisY()->setLinePenColor(gridColor);
 
         // QChart::ChartTheme theme = QChart::ChartTheme::ChartThemeQt;
         // c->setTheme(theme);
@@ -179,9 +202,18 @@ int main(int argc, char** argv) {
     // wLegend->layout->setContentsMargins(0, 0, 0, 0);
     // wLegend->layout->setSpacing(0);
 
+    QColor bgColor = w->palette().color(QPalette::Background);
+    auto blue = QColor{0, 0, 255, 255};
+    auto red = QColor{255, 0, 0, 255};
+    if (bgColor.toHsv().value() < 155) {
+        blue = QColor{0, 200, 255, 255};
+        red = QColor{255, 70, 70, 255};
+    }
+
     wLegend->addWidget(w.get());
     QLabel* legend = new QLabel(
-        "<b><font color='#0000FF' font_size=6>• READ&nbsp;&nbsp;&nbsp;<b><font color='#ff0000' font_size=6>• WRITE"
+        "<b><font color='" + blue.name(QColor::HexRgb) + "' font_size=6>• READ&nbsp;&nbsp;&nbsp;<b><font color='" + red.name(QColor::HexRgb) +
+        "' font_size=6>• WRITE"
     );
     wLegend->addWidget(legend);
     legend->setAlignment(Qt::AlignCenter);

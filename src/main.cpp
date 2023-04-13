@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
         c->setAxisX(axisX, s2.get());
 
         c->setMargins(QMargins(0, 0, 0, -20));
-        c->setMinimumSize(0,0);
+        // c->setMinimumSize(0,0);
 
         rptr<QChartView> cv = new QChartView(c.get());
 
@@ -238,13 +238,14 @@ int main(int argc, char** argv) {
         // for (int i = 0; i < w->layout->columnCount(); i++) { w->layout->setColumnStretch(i, 0); }
         for (auto& [dev, _] : chart) { w->layout->removeWidget(chart[dev].get()); }
         int itemNum = 0;
-        int itemsInRow = 3;
-        if (3 < chart.size()) itemsInRow = (chart.size() + 1) / 2;
+        int itemsInRow = 4;
+        if (4 < chart.size()) itemsInRow = (chart.size() + 1) / 2;
         if (10 < chart.size()) itemsInRow = (chart.size() + 2) / 3;
         for (auto& [dev, _] : chart) {
             w->layout->addWidget(chart[dev].get(), itemNum % itemsInRow, itemNum / itemsInRow);
             itemNum++;
         }
+        w->setMinimumSize(120,120);
         // for (int i = 0; i < w->layout->rowCount(); i++) { w->layout->setRowStretch(i, 100); }
         // for (int i = 0; i < w->layout->columnCount(); i++) { w->layout->setColumnStretch(i, 100); }
     };

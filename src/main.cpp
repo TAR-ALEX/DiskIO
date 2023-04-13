@@ -1,6 +1,7 @@
 #include "AspectRatioWidget.hpp"
 #include <QtCharts/QChartView>
 #include <QtCharts/QLineSeries>
+#include <QtCharts/QValueAxis>
 #include <QtCore/QObject>
 #include <QtGui/QPainter>
 #include <QtWidgets/QApplication>
@@ -130,10 +131,10 @@ int main(int argc, char** argv) {
 
     auto createChart = [&](std::string name) {
         rptr<QChart> c = new QChart();
-        c->layout()->setContentsMargins(0, 0, 0, 0);
         rptr<QLineSeries> s1 = new QLineSeries();
         rptr<QLineSeries> s2 = new QLineSeries();
         QColor bgColor = c->palette().color(QPalette::Background);
+        QColor bgColorInactive = c->palette().color(QPalette::Base);
         s1->setPen(QPen{QBrush{QColor{0, 0, 255, 255}}, 2});
         s2->setPen(QPen{QBrush{QColor{255, 0, 0, 255}}, 2});
         if (bgColor.toHsv().value() < 155) {
@@ -141,8 +142,12 @@ int main(int argc, char** argv) {
             s2->setPen(QPen{QBrush{QColor{255, 70, 70, 255}}, 2});
         }
         c->legend()->hide();
-        c->addSeries(s1.get());
+                c->addSeries(s1.get());
         c->addSeries(s2.get());
+        QValueAxis* axisY = new QValueAxis();
+        QValueAxis* axisX = new QValueAxis();
+
+        // axisY->setLabelFormat("%03d");
         c->createDefaultAxes();
         QFont font = c->titleFont();
         font.setBold(true);
@@ -153,49 +158,57 @@ int main(int argc, char** argv) {
         // c->palette().color(QPalette::WindowText);
         c->setTitleFont(font);
         c->setTitle(name.c_str());
-        c->axisX()->setLabelsVisible(false);
-        c->axisY()->setTitleText("MB/s");
-        font = c->axisY()->titleFont();
+
+        axisX->setLabelsVisible(false);
+        axisY->setTitleText("MB/s");
+        font = axisY->titleFont();
         font.setPointSizeF(font.pointSizeF() * 4 / 5);
-        c->axisY()->setTitleBrush(QBrush{fgColor});
-        c->axisY()->setTitleFont(font);
-        c->axisX()->setRange(0, 100);
-        c->axisY()->setRange(0, 100);
+        c->setPlotAreaBackgroundBrush(QBrush{bgColorInactive});
+        c->setPlotAreaBackgroundVisible(true);
+        c->setBackgroundBrush(QBrush{bgColor});
+        axisY->setTitleBrush(QBrush{fgColor});
+        axisY->setTitleFont(font);
+        axisX->setRange(0, 100);
+        axisY->setRange(0, 100);
 
-        c->axisY()->setGridLineColor(gridColor);
-        c->axisX()->setGridLineColor(gridColor);
-        c->axisX()->setLabelsColor(fgColor);
-        c->axisY()->setLabelsColor(fgColor);
-        c->axisX()->setShadesColor(gridColor);
-        c->axisY()->setShadesColor(gridColor);
-        c->axisX()->setMinorGridLineColor(gridColor);
-        c->axisY()->setMinorGridLineColor(gridColor);
-        c->axisX()->setShadesBorderColor(gridColor);
-        c->axisY()->setShadesBorderColor(gridColor);
-        c->axisX()->setLinePenColor(gridColor);
-        c->axisY()->setLinePenColor(gridColor);
+        axisY->setGridLineColor(gridColor);
+        axisX->setGridLineColor(gridColor);
+        axisX->setLabelsColor(fgColor);
+        axisY->setLabelsColor(fgColor);
+        axisX->setShadesColor(gridColor);
+        axisY->setShadesColor(gridColor);
+        axisX->setMinorGridLineColor(gridColor);
+        axisY->setMinorGridLineColor(gridColor);
+        axisX->setShadesBorderColor(gridColor);
+        axisY->setShadesBorderColor(gridColor);
+        axisX->setLinePenColor(gridColor);
+        axisY->setLinePenColor(gridColor);
 
-        // QChart::ChartTheme theme = QChart::ChartTheme::ChartThemeQt;
-        // c->setTheme(theme);
-        // c->setAutoFillBackground(false);
-        c->setBackgroundVisible(false);
+        c->setBackgroundRoundness(0);
+        c->setAxisY(axisY, s1.get());
+        c->setAxisX(axisX, s1.get());
+        c->setAxisY(axisY, s2.get());
+        c->setAxisX(axisX, s2.get());
 
-
-        c->setMargins(QMargins(0, 0, 0, 0));
+        c->setMargins(QMargins(0, 0, 0, -20));
+        c->setMinimumSize(0,0);
 
         rptr<QChartView> cv = new QChartView(c.get());
 
+        // cv->setContentsMargins(QMargins(0, 0, 0, -50));
         cv->setRenderHint(QPainter::Antialiasing);
-
+        cv->setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
+        cv->setMinimumSize(80, 80);
         return std::tuple{cv, s1, s2};
     };
 
     cptr<QApplication> app = new QApplication(argc, argv);
-    cptr<QMainWindow> mw = new QMainWindow();
+    rptr<QMainWindow> mw = new QMainWindow();
 
-    cptr<EQLayoutWidget<QGridLayout>> w = new EQLayoutWidget<QGridLayout>();
+    rptr<EQLayoutWidget<QGridLayout>> w = new EQLayoutWidget<QGridLayout>();
+    w->setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
 
-    cptr<EQLayoutWidget<QVBoxLayout>> wLegend = new EQLayoutWidget<QVBoxLayout>();
+    rptr<EQLayoutWidget<QVBoxLayout>> wLegend = new EQLayoutWidget<QVBoxLayout>();
     // wLegend->setContentsMargins(0, 0, 0, 0);
     // w->setContentsMargins(0, 0, 0, 0);
     // w->layout->setContentsMargins(0, 0, 0, 0);
@@ -212,23 +225,28 @@ int main(int argc, char** argv) {
 
     wLegend->addWidget(w.get());
     QLabel* legend = new QLabel(
-        "<b><font color='" + blue.name(QColor::HexRgb) + "' font_size=6>• READ&nbsp;&nbsp;&nbsp;<b><font color='" + red.name(QColor::HexRgb) +
-        "' font_size=6>• WRITE"
+        "<b><font color='" + blue.name(QColor::HexRgb) + "' font_size=6>• READ&nbsp;&nbsp;&nbsp;<b><font color='" +
+        red.name(QColor::HexRgb) + "' font_size=6>• WRITE"
     );
     wLegend->addWidget(legend);
     legend->setAlignment(Qt::AlignCenter);
+    legend->setContentsMargins(QMargins(0, 0, 0, 5));
+    w->layout->setVerticalSpacing(0);
 
     auto updateStrech = [&]() {
+        // for (int i = 0; i < w->layout->rowCount(); i++) { w->layout->setRowStretch(i, 0); }
+        // for (int i = 0; i < w->layout->columnCount(); i++) { w->layout->setColumnStretch(i, 0); }
         for (auto& [dev, _] : chart) { w->layout->removeWidget(chart[dev].get()); }
         int itemNum = 0;
-        int itemsInRow = 5;
-        if (itemsInRow <= 10) itemsInRow = (chart.size() + 1) / 2;
+        int itemsInRow = 3;
+        if (3 < chart.size()) itemsInRow = (chart.size() + 1) / 2;
+        if (10 < chart.size()) itemsInRow = (chart.size() + 2) / 3;
         for (auto& [dev, _] : chart) {
             w->layout->addWidget(chart[dev].get(), itemNum % itemsInRow, itemNum / itemsInRow);
             itemNum++;
         }
-        for (int i = 0; i < w->layout->rowCount(); i++) { w->layout->setRowStretch(i, 1); }
-        for (int i = 0; i < w->layout->columnCount(); i++) { w->layout->setColumnStretch(i, 1); }
+        // for (int i = 0; i < w->layout->rowCount(); i++) { w->layout->setRowStretch(i, 100); }
+        // for (int i = 0; i < w->layout->columnCount(); i++) { w->layout->setColumnStretch(i, 100); }
     };
 
 
@@ -267,5 +285,6 @@ int main(int argc, char** argv) {
         sem.wait();
     };
     dstats.run();
-    return app->exec();
+    int code = app->exec();
+    return code;
 }

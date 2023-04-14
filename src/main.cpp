@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
     DiskStats dstats;
 
     std::map<std::string, std::pair<rptr<QLineSeries>, rptr<QLineSeries>>> series;
-    std::map<std::string, rptr<QChartView>> chart;
+    std::map<std::string, rptr<ContainerWidget>> chart;
 
     auto createChart = [&](std::string name) {
         rptr<QChart> c = new QChart();
@@ -191,15 +191,14 @@ int main(int argc, char** argv) {
         c->setAxisX(axisX, s2.get());
 
         c->setMargins(QMargins(0, 0, 0, -20));
-        // c->setMinimumSize(0,0);
 
         rptr<QChartView> cv = new QChartView(c.get());
+        rptr<ContainerWidget> cw = new ContainerWidget(cv, nullptr);
 
         // cv->setContentsMargins(QMargins(0, 0, 0, -50));
         cv->setRenderHint(QPainter::Antialiasing);
         cv->setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
-        cv->setMinimumSize(80, 80);
-        return std::tuple{cv, s1, s2};
+        return std::tuple{cw, s1, s2};
     };
 
     cptr<QApplication> app = new QApplication(argc, argv);
@@ -273,12 +272,13 @@ int main(int argc, char** argv) {
                 series[dev].first->append(idx, stat.first);
                 double yMax = 20.0 + fmax(getMaxY(series[dev].first.get()), getMaxY(series[dev].second.get()));
                 yMax = uint64_t(yMax / 25.0) * 25 + 25;
-                chart[dev]->chart()->axisY()->setRange(0, yMax);
+                auto chrt = static_cast<QChartView*>(chart[dev]->getWidget())->chart();
+                chrt->axisY()->setRange(0, yMax);
                 keepLastSeries(series[dev].first.get(), 600);
                 keepLastSeries(series[dev].second.get(), 600);
                 QLineSeries ss;
                 ss.points();
-                chart[dev]->chart()->axisX()->setRange(idx - 300, idx);
+                chrt->axisX()->setRange(idx - 300, idx);
             }
             idx++;
             sem.notify();

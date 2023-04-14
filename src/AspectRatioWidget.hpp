@@ -67,6 +67,9 @@ public:
         centralWidget = w;
         centralWidget->setParent(this);
     }
+    QWidget* getWidget(){
+        return centralWidget.get();
+    }
 };
 
 class EQMarginWidget : public QWidget {

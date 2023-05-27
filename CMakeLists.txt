@@ -10,12 +10,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 # set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -no-pie -Wall -Wextra")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-# set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -zopt -flto -fremap-arrays -mllvm -reduce-array-computations=3 -faggressive-loop-transform") # for amd compiler
 
-if(WIN32)
-  # see https://blog.kitware.com/create-dlls-on-windows-without-declspec-using-new-cmake-export-all-feature/
-  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-endif(WIN32)
+set(Qt5_DIR ./vendor/usr/lib/x86_64-linux-gnu/cmake/Qt5)
+find_package(Qt5 REQUIRED Core Widgets Gui Charts)
 
 # the -I flag in gcc
 include_directories(${PROJECT_SOURCE_DIR}/include/, ${PROJECT_SOURCE_DIR}/vendor/include/) 
@@ -29,4 +26,10 @@ file(GLOB_RECURSE VENDOR_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/vendor
 
 add_executable(${PROJECT_NAME} ${APP_SOURCES} ${VENDOR_SOURCES})
 target_compile_options(${PROJECT_NAME} PRIVATE -fPIC)
-target_link_libraries(${PROJECT_NAME} pthread Qt5PrintSupport Qt5Network Qt5Charts Qt5Widgets Qt5Gui Qt5Core)
+target_link_libraries(${PROJECT_NAME} 
+    pthread
+    Qt5::Core
+    Qt5::Gui
+    Qt5::Widgets
+    Qt5::Charts
+)

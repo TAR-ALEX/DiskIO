@@ -1,15 +1,15 @@
 #include "AspectRatioWidget.hpp"
-#include <QtCharts/QChartView>
-#include <QtCharts/QLineSeries>
-#include <QtCharts/QValueAxis>
-#include <QtCore/QObject>
-#include <QtGui/QPainter>
-#include <QtWidgets/QApplication>
-#include <QtWidgets/QColorDialog>
-#include <QtWidgets/QGridLayout>
-#include <QtWidgets/QMainWindow>
-#include <QtWidgets/QPushButton>
-#include <QtWidgets/QtWidgets>
+#include <QApplication>
+#include <QChartView>
+#include <QColorDialog>
+#include <QGridLayout>
+#include <QLineSeries>
+#include <QMainWindow>
+#include <QObject>
+#include <QPainter>
+#include <QPushButton>
+#include <QValueAxis>
+#include <QtWidgets>
 #include <estd/ptr.hpp>
 #include <estd/string_util.h>
 #include <estd/thread_pool.hpp>
@@ -52,15 +52,14 @@ std::vector<std::string> getDevices() {
     std::vector<std::string> devices = getPaths("/sys/block/");
     std::vector<std::string> result;
     for (auto d : devices) {
-        if (!contains(d, "loop", true)) {
+        if (!contains(d, "loop", true) && !contains(d, "zram", true) && !contains(d, "dm", true)) {
             auto sd = splitAll(d, "/");
-            result.push_back(sd.at(sd.size() - 1)); //will throw this way vs back or []
+            result.push_back(sd.at(sd.size() - 1)); //will throw this way vs back or operator[]
         }
     }
     return result;
 }
 
-// <read, write>
 std::pair<uint64_t, uint64_t> getDevStats(std::string dev) {
     // Field 3 -- # of sectors read
     // Field 7 -- # of sectors written
@@ -142,7 +141,7 @@ int main(int argc, char** argv) {
             s2->setPen(QPen{QBrush{QColor{255, 70, 70, 255}}, 2});
         }
         c->legend()->hide();
-                c->addSeries(s1.get());
+        c->addSeries(s1.get());
         c->addSeries(s2.get());
         QValueAxis* axisY = new QValueAxis();
         QValueAxis* axisX = new QValueAxis();
@@ -208,11 +207,6 @@ int main(int argc, char** argv) {
     w->setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
 
     rptr<EQLayoutWidget<QVBoxLayout>> wLegend = new EQLayoutWidget<QVBoxLayout>();
-    // wLegend->setContentsMargins(0, 0, 0, 0);
-    // w->setContentsMargins(0, 0, 0, 0);
-    // w->layout->setContentsMargins(0, 0, 0, 0);
-    // wLegend->layout->setContentsMargins(0, 0, 0, 0);
-    // wLegend->layout->setSpacing(0);
 
     QColor bgColor = w->palette().color(QPalette::Background);
     auto blue = QColor{0, 0, 255, 255};
@@ -233,8 +227,6 @@ int main(int argc, char** argv) {
     w->layout->setVerticalSpacing(0);
 
     auto updateStrech = [&]() {
-        // for (int i = 0; i < w->layout->rowCount(); i++) { w->layout->setRowStretch(i, 0); }
-        // for (int i = 0; i < w->layout->columnCount(); i++) { w->layout->setColumnStretch(i, 0); }
         for (auto& [dev, _] : chart) { w->layout->removeWidget(chart[dev].get()); }
         int itemNum = 0;
         int itemsInRow = 4;
@@ -244,9 +236,7 @@ int main(int argc, char** argv) {
             w->layout->addWidget(chart[dev].get(), itemNum % itemsInRow, itemNum / itemsInRow);
             itemNum++;
         }
-        w->setMinimumSize(120,120);
-        // for (int i = 0; i < w->layout->rowCount(); i++) { w->layout->setRowStretch(i, 100); }
-        // for (int i = 0; i < w->layout->columnCount(); i++) { w->layout->setColumnStretch(i, 100); }
+        w->setMinimumSize(120, 120);
     };
 
 
@@ -266,8 +256,6 @@ int main(int argc, char** argv) {
                 }
             }
             for (auto& [dev, stat] : mbps) {
-                // std::cout << dev << "\n";
-                // std::cout << "\t" << stat.first << " " << stat.second << "\n";
                 series[dev].second->append(idx, stat.second);
                 series[dev].first->append(idx, stat.first);
                 double yMax = 20.0 + fmax(getMaxY(series[dev].first.get()), getMaxY(series[dev].second.get()));

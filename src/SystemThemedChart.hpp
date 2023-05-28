@@ -67,6 +67,7 @@ public:
         setPlotAreaBackgroundBrush(QBrush(bgColorInactive));
         setPlotAreaBackgroundVisible(true);
         setBackgroundBrush(QBrush(bgColor));
+        setBackgroundVisible(false);
 
 
 

@@ -18,10 +18,11 @@ void keepLastSeries(QLineSeries* ser, int numKeep = 200) {
     while (ser->count() > numKeep) { ser->remove(0); }
 }
 
+template<class STAT_TYPE = DiskStats>
 class DiskUsageWidget : public ContainerWidget {
 private:
     int idx = 0;
-    DiskStats dstats;
+    STAT_TYPE dstats;
 
     std::map<std::string, std::pair<rptr<QLineSeries>, rptr<QLineSeries>>> series;
     std::map<std::string, rptr<ContainerWidget>> chart;
@@ -45,6 +46,8 @@ private:
             c->addLineSeriesWithArea(s1.get());
             QValueAxis* axisY = new QValueAxis();
             QValueAxis* axisX = new QValueAxis();
+
+            c->setTitle(name.c_str());
 
             // axisY->setLabelFormat("%03d");
             QFont font = c->titleFont();
@@ -129,6 +132,8 @@ public:
             blue = QColor{0, 200, 255, 255};
             red = QColor{255, 70, 70, 255};
         }
+
+        wLegend->setAutoFillBackground(true);
 
         wLegend->addWidget(w.get());
         QLabel* legend = new QLabel(

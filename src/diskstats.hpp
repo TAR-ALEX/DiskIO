@@ -1,9 +1,7 @@
 
 #pragma once
-void printMap(const std::map<std::string, std::pair<double, double>>& myMap)
-{
-    for (const auto& entry : myMap)
-    {
+void printMap(const std::map<std::string, std::pair<double, double>>& myMap) {
+    for (const auto& entry : myMap) {
         std::cout << entry.first << ": (" << entry.second.first << ", " << entry.second.second << ")" << std::endl;
     }
 }
@@ -23,35 +21,36 @@ std::vector<std::string> getPaths(std::string path) {
     return result;
 }
 
-uint64_t getSectorSize(std::string dev) {
-    std::string s = readfile("/sys/block/" + dev + "/queue/hw_sector_size");
-    return stoll(s);
-}
-
-std::vector<std::string> getDevices() {
-    std::vector<std::string> devices = getPaths("/sys/block/");
-    std::vector<std::string> result;
-    for (auto d : devices) {
-        if (!contains(d, "loop", true) && !contains(d, "zram", true) && !contains(d, "dm", true)) {
-            auto sd = splitAll(d, "/");
-            result.push_back(sd.at(sd.size() - 1)); //will throw this way vs back or operator[]
-        }
-    }
-    return result;
-}
-
-std::pair<uint64_t, uint64_t> getDevStats(std::string dev) {
-    // Field 3 -- # of sectors read
-    // Field 7 -- # of sectors written
-
-    std::string f = readfile("/sys/block/" + dev + "/stat");
-    auto tok = splitAll(f, " ", false);
-    if (tok.size() < 17) throw std::runtime_error("filestats invalid " + std::to_string(tok.size()));
-    uint64_t sectorSize = getSectorSize(dev);
-    return {stoll(tok[2]) * sectorSize, stoll(tok[6]) * sectorSize};
-}
-
 class DiskStats {
+private:
+    uint64_t getSectorSize(std::string dev) {
+        std::string s = readfile("/sys/block/" + dev + "/queue/hw_sector_size");
+        return stoll(s);
+    }
+
+    std::vector<std::string> getDevices() {
+        std::vector<std::string> devices = getPaths("/sys/block/");
+        std::vector<std::string> result;
+        for (auto d : devices) {
+            if (!contains(d, "loop", true) && !contains(d, "zram", true) && !contains(d, "dm", true)) {
+                auto sd = splitAll(d, "/");
+                result.push_back(sd.at(sd.size() - 1)); //will throw this way vs back or operator[]
+            }
+        }
+        return result;
+    }
+
+    std::pair<uint64_t, uint64_t> getDevStats(std::string dev) {
+        // Field 3 -- # of sectors read
+        // Field 7 -- # of sectors written
+
+        std::string f = readfile("/sys/block/" + dev + "/stat");
+        auto tok = splitAll(f, " ", false);
+        if (tok.size() < 17) throw std::runtime_error("filestats invalid " + std::to_string(tok.size()));
+        uint64_t sectorSize = getSectorSize(dev);
+        return {stoll(tok[2]) * sectorSize, stoll(tok[6]) * sectorSize};
+    }
+
 public:
     uint64_t lastTime = 0;
     std::map<std::string, std::pair<uint64_t, uint64_t>> lastBytes;

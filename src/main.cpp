@@ -32,22 +32,59 @@ using namespace estd::string_util;
 
 #include "./DiskUsageWidget.hpp"
 #include "./SystemThemedChart.hpp"
+#include "./systemstats.hpp"
+#include "./networkstats.hpp"
+#include "SystemOverviewWidgets.hpp"
 
 
 int main(int argc, char** argv) {
     cptr<QApplication> app = new QApplication(argc, argv);
-    rptr<QMainWindow> mw = new QMainWindow();
+    QMainWindow* mw = new QMainWindow();
 
-    DiskUsageWidget* duw = new DiskUsageWidget();
+    QTabWidget* tabWidget = new QTabWidget(mw);
+
     QLambdaTimer qlt(250);
-    qlt.start();
-    duw->attachTo(qlt);
 
-    mw->setCentralWidget(duw);
+    DiskUsageWidget<DiskStats>* duw = new DiskUsageWidget<DiskStats>();
+    DiskUsageWidget<NetworkStats>* nuw = new DiskUsageWidget<NetworkStats>();
+    OverviewWidget* ovr = new OverviewWidget();
+
+    tabWidget->addTab(ovr, "Summary");
+    tabWidget->addTab(duw, "Disk");
+    tabWidget->addTab(nuw, "Network");
+
+    mw->setCentralWidget(tabWidget);
     mw->resize(600, 600);
 
     mw->show();
 
+    duw->attachTo(qlt);
+    nuw->attachTo(qlt);
+    ovr->attachTo(qlt);
+    qlt.start();
+
     int code = app->exec();
     return code;
 }
+
+
+
+// int main() {
+//     NetworkStats monitor;
+
+//     while (true) {
+//         try {
+//             // monitor.getRate();
+//             printMap(monitor.getRate());
+            
+//         }
+//         catch (const std::exception& e) {
+//             std::cerr << "Error: " << e.what() << std::endl;
+//             return 1;
+//         }
+
+//         std::this_thread::sleep_for(std::chrono::seconds(1));
+//     }
+
+//     return 0;
+// }

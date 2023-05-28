@@ -1,5 +1,6 @@
 #include "AspectRatioWidget.hpp"
 #include <QtCharts/QChartView>
+#include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QValueAxis>
 #include <QtCore/QObject>
@@ -22,40 +23,26 @@
 #include <sstream>
 #include <thread>
 #include <vector>
-#include <QtCharts/QDateTimeAxis>
+
+#include "./SystemThemedChart.hpp"
+
 namespace fs = std::filesystem;
 QT_CHARTS_USE_NAMESPACE
 
-class MainWindow : public QMainWindow
-{
+class MainWindow : public QMainWindow {
 public:
-    MainWindow(QWidget *parent = nullptr)
-        : QMainWindow(parent)
-    {
-        // Create the tab widget
-        QTabWidget* tabWidget = new QTabWidget(this);
+    MainWindow(QWidget* parent = nullptr) : QMainWindow(parent) {
+        QWidget* centralWidget = new QWidget(this);
+        QVBoxLayout* layout = new QVBoxLayout(centralWidget);
+        setCentralWidget(centralWidget);
 
-        // Create the CPU usage tab
-        QWidget* cpuTab = new QWidget();
-        createCpuTab(cpuTab);
-
-        // Create the memory usage tab
-        QWidget* memoryTab = new QWidget();
-        createMemoryTab(memoryTab);
-
-        // Add the tabs to the tab widget
-        tabWidget->addTab(cpuTab, "CPU Usage");
-        tabWidget->addTab(memoryTab, "Memory Usage");
-
-        // Set the tab widget as the central widget
-        setCentralWidget(tabWidget);
+        layout->addWidget(createCpuChart());
+        layout->addWidget(createMemoryChart());
 
         // Set up the timer to update the charts
         m_timer = new QTimer(this);
         m_timer->setInterval(m_updateIntervalMs);
-        connect(m_timer, &QTimer::timeout, this, [this]() {
-            updateCharts();
-        });
+        connect(m_timer, &QTimer::timeout, this, [this]() { updateCharts(); });
         m_timer->start();
 
         // Initialize the CPU timer and previous usage
@@ -67,15 +54,14 @@ public:
     }
 
 private:
-    void createCpuTab(QWidget* parent)
-    {
+    QWidget* createCpuChart() {
         // Create the line series for the CPU usage data
-        m_cpuSeries = new QLineSeries(parent);
+        m_cpuSeries = new QLineSeries();
 
         // Create the chart and add the line series to it
-        QChart* cpuChart = new QChart();
+        SystemThemedChart* cpuChart = new SystemThemedChart();
         cpuChart->legend()->hide();
-        cpuChart->addSeries(m_cpuSeries);
+        cpuChart->addLineSeriesWithArea(m_cpuSeries);
         cpuChart->setTitle("CPU Usage");
 
         // Create the X-axis and set it to a time axis
@@ -92,23 +78,20 @@ private:
         cpuChart->addAxis(cpuYAxis, Qt::AlignLeft);
         m_cpuSeries->attachAxis(cpuYAxis);
 
-        // Create the chart view and set it as the layout for the CPU tab
+        // Create the chart view and add it to the layout
         QChartView* cpuChartView = new QChartView(cpuChart);
         cpuChartView->setRenderHint(QPainter::Antialiasing);
-
-        QVBoxLayout* layout = new QVBoxLayout(parent);
-        layout->addWidget(cpuChartView);
+        return cpuChartView;
     }
 
-    void createMemoryTab(QWidget* parent)
-    {
+    QWidget* createMemoryChart() {
         // Create the line series for the memory usage data
-        m_memorySeries = new QLineSeries(parent);
+        m_memorySeries = new QLineSeries();
 
         // Create the chart and add the line series to it
-        QChart* memoryChart = new QChart();
+        SystemThemedChart* memoryChart = new SystemThemedChart();
         memoryChart->legend()->hide();
-        memoryChart->addSeries(m_memorySeries);
+        memoryChart->addLineSeriesWithArea(m_memorySeries);
         memoryChart->setTitle("Memory Usage");
 
         // Create the X-axis and set it to a time axis
@@ -125,21 +108,17 @@ private:
         memoryChart->addAxis(memoryYAxis, Qt::AlignLeft);
         m_memorySeries->attachAxis(memoryYAxis);
 
-        // Create the chart view and set it as the layout for the memory tab
+        // Create the chart view and return it
         QChartView* memoryChartView = new QChartView(memoryChart);
         memoryChartView->setRenderHint(QPainter::Antialiasing);
-
-        QVBoxLayout* layout = new QVBoxLayout(parent);
-        layout->addWidget(memoryChartView);
+        return memoryChartView;
     }
 
-    void updateCharts()
-    {
+    void updateCharts() {
         // Update CPU chart
         int cpuUsage = getCpuUsage();
         m_cpuSeries->append(QDateTime::currentDateTime().toMSecsSinceEpoch(), cpuUsage);
-        if (m_cpuSeries->count() > m_maxDataPoints)
-            m_cpuSeries->remove(0);
+        if (m_cpuSeries->count() > m_maxDataPoints) m_cpuSeries->remove(0);
         qint64 cpuMaxX = QDateTime::currentDateTime().toMSecsSinceEpoch();
         qint64 cpuMinX = cpuMaxX - m_xAxisRangeMs;
         m_cpuXAxis->setRange(QDateTime::fromMSecsSinceEpoch(cpuMinX), QDateTime::fromMSecsSinceEpoch(cpuMaxX));
@@ -147,18 +126,15 @@ private:
         // Update Memory chart
         int memoryUsage = getMemoryUsage();
         m_memorySeries->append(QDateTime::currentDateTime().toMSecsSinceEpoch(), memoryUsage);
-        if (m_memorySeries->count() > m_maxDataPoints)
-            m_memorySeries->remove(0);
+        if (m_memorySeries->count() > m_maxDataPoints) m_memorySeries->remove(0);
         qint64 memoryMaxX = QDateTime::currentDateTime().toMSecsSinceEpoch();
         qint64 memoryMinX = memoryMaxX - m_xAxisRangeMs;
         m_memoryXAxis->setRange(QDateTime::fromMSecsSinceEpoch(memoryMinX), QDateTime::fromMSecsSinceEpoch(memoryMaxX));
     }
 
-    int getCpuUsage()
-    {
+    int getCpuUsage() {
         QFile statFile("/proc/stat");
-        if (!statFile.open(QIODevice::ReadOnly | QIODevice::Text))
-            return -1;
+        if (!statFile.open(QIODevice::ReadOnly | QIODevice::Text)) return -1;
 
         QTextStream in(&statFile);
         QString line;
@@ -173,7 +149,6 @@ private:
                     int idle = values[4].toInt();
 
                     int totalTime = user + nice + system + idle;
-                    int elapsedTime = m_cpuTimer.elapsed();
 
                     int deltaTime = totalTime - m_previousTotalTime;
                     int currentUsage = (deltaTime > 0) ? ((deltaTime - (idle - m_previousIdle)) * 100) / deltaTime : 0;
@@ -181,8 +156,7 @@ private:
                     m_previousTotalTime = totalTime;
                     m_previousIdle = idle;
 
-                    if (currentUsage < 0)
-                        currentUsage = 0;
+                    if (currentUsage < 0) currentUsage = 0;
                     else if (currentUsage > 100)
                         currentUsage = 100;
 
@@ -197,48 +171,43 @@ private:
         return -1;
     }
 
-    int getMemoryUsage()
-{
-    QFile meminfoFile("/proc/meminfo");
-    if (!meminfoFile.open(QIODevice::ReadOnly | QIODevice::Text))
-        return -1;
+    int getMemoryUsage() {
+        QFile meminfoFile("/proc/meminfo");
+        if (!meminfoFile.open(QIODevice::ReadOnly | QIODevice::Text)) return -1;
 
-    QTextStream in(&meminfoFile);
-    QString line;
-    int totalMemory = 0;
-    int freeMemory = 0;
+        QTextStream in(&meminfoFile);
+        QString line;
+        int totalMemory = 0;
+        int freeMemory = 0;
 
-    do {
-        line = in.readLine();
-        if (line.startsWith("MemTotal:")) {
-            totalMemory = line.split(" ", QString::SkipEmptyParts)[1].toInt();
-        } else if (line.startsWith("MemAvailable:")) {
-            freeMemory = line.split(" ", QString::SkipEmptyParts)[1].toInt();
+        do {
+            line = in.readLine();
+            if (line.startsWith("MemTotal:")) {
+                totalMemory = line.split(" ", QString::SkipEmptyParts)[1].toInt();
+            } else if (line.startsWith("MemAvailable:")) {
+                freeMemory = line.split(" ", QString::SkipEmptyParts)[1].toInt();
+            }
+        } while (!line.isNull());
+
+        meminfoFile.close();
+
+        if (totalMemory > 0) {
+            int usedMemory = totalMemory - freeMemory;
+            int currentUsage = (usedMemory * 100) / totalMemory;
+
+            if (currentUsage < 0) currentUsage = 0;
+            else if (currentUsage > 100)
+                currentUsage = 100;
+
+            return currentUsage;
         }
-    } while (!line.isNull());
 
-    meminfoFile.close();
-
-    if (totalMemory > 0) {
-        int usedMemory = totalMemory - freeMemory;
-        int currentUsage = (usedMemory * 100) / totalMemory;
-
-        if (currentUsage < 0)
-            currentUsage = 0;
-        else if (currentUsage > 100)
-            currentUsage = 100;
-
-        return currentUsage;
+        return -1;
     }
-
-    return -1;
-}
 
 private:
     QLineSeries* m_cpuSeries;
     QLineSeries* m_memorySeries;
-    QChart* m_cpuChart;
-    QChart* m_memoryChart;
     QTimer* m_timer;
     QDateTimeAxis* m_cpuXAxis;
     QDateTimeAxis* m_memoryXAxis;
@@ -252,8 +221,7 @@ private:
     int m_previousFreeMemory;
 };
 
-int main2(int argc, char* argv[])
-{
+int main2(int argc, char* argv[]) {
     QApplication a(argc, argv);
 
     MainWindow w;

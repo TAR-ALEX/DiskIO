@@ -1,6 +1,7 @@
 deb-recurse-limit 2,
 deb qtbase5-dev "./usr/" "./vendor/usr/",
 deb libqt5charts5-dev "./usr/" "./vendor/usr/",
+deb libegl-dev "./usr/" "./vendor/usr/",
 
 deb-recurse-limit 2,
 deb libgl-dev "./usr/include/GL/" "./vendor/include/GL/",

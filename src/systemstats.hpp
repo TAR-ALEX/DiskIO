@@ -72,8 +72,8 @@ public:
         meminfoFile.close();
 
         if (totalMemory > 0) {
-            int usedMemory = totalMemory - freeMemory;
-            int currentUsage = (usedMemory * 100) / totalMemory;
+            uint64_t usedMemory = totalMemory - freeMemory;
+            uint64_t currentUsage = (usedMemory * 100) / totalMemory;
 
             if (currentUsage < 0) currentUsage = 0;
             else if (currentUsage > 100)

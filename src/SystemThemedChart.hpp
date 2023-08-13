@@ -33,14 +33,6 @@ public:
         QColor bgColor = palette().color(QPalette::Background);
         QColor bgColorInactive = palette().color(QPalette::Base);
 
-        QPen pen1(QBrush(QColor(0, 0, 255, 255)), 2);
-        QPen pen2(QBrush(QColor(255, 0, 0, 255)), 2);
-
-        if (bgColor.toHsv().value() < 155) {
-            pen1 = QPen(QBrush(QColor(0, 230, 255, 255)), 2);
-            pen2 = QPen(QBrush(QColor(255, 70, 70, 255)), 2);
-        }
-
         legend()->hide();
 
         QValueAxis* axisY = new QValueAxis();

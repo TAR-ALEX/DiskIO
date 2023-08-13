@@ -9,129 +9,201 @@
 
 using namespace QtCharts;
 
-class CpuUsageWidget : public ContainerWidget {
+class ValueUsageWidget : public ContainerWidget {
 private:
-    SystemStats sysstats;
-    QLineSeries* m_cpuSeries;
-    QDateTimeAxis* m_cpuXAxis;
-    QWidget* createCpuChart() {
-        // Create the line series for the CPU usage data
-        m_cpuSeries = new QLineSeries();
+    std::function<std::vector<double>()> getDataFunction;
+    std::vector<QLineSeries*> m_series;
+    QDateTimeAxis* m_xAxis;
+    QString title;
+    QValueAxis* m_yAxis;
+
+    QWidget* createChart(QList<QColor> colors = QList<QColor>{}) {
+        // Create the line series for the data
+        for (size_t i = 0; i < getDataFunction().size(); i++) { m_series.push_back(new QLineSeries()); }
 
         // Create the chart and add the line series to it
-        SystemThemedChart* cpuChart = new SystemThemedChart();
-        cpuChart->legend()->hide();
-        cpuChart->addLineSeriesWithArea(m_cpuSeries);
-        cpuChart->setTitle("CPU Usage");
+        SystemThemedChart* chart = new SystemThemedChart();
+        chart->legend()->hide();
+        chart->setTitle(title);
+        if(colors.size() != 0)
+            chart->sequentialColors = colors;
+        for (auto* series : m_series) { chart->addLineSeriesWithArea(series); }
 
         // Create the X-axis and set it to a time axis
-        m_cpuXAxis = new QDateTimeAxis();
-        m_cpuXAxis->setTickCount(10);
-        m_cpuXAxis->setFormat("hh:mm:ss");
-        m_cpuXAxis->setLabelsVisible(false);
-        cpuChart->addAxis(m_cpuXAxis, Qt::AlignBottom);
-        m_cpuSeries->attachAxis(m_cpuXAxis);
+        m_xAxis = new QDateTimeAxis();
+        m_xAxis->setTickCount(10);
+        m_xAxis->setFormat("hh:mm:ss");
+        m_xAxis->setLabelsVisible(false);
+        chart->addAxis(m_xAxis, Qt::AlignBottom);
+        for (auto* series : m_series) { series->attachAxis(m_xAxis); }
 
-        // Create the Y-axis and set the range
-        QValueAxis* cpuYAxis = new QValueAxis();
-        cpuYAxis->setLabelFormat("%.0f%%");
-        cpuYAxis->setRange(0, 100);
-        cpuChart->addAxis(cpuYAxis, Qt::AlignLeft);
-        m_cpuSeries->attachAxis(cpuYAxis);
+        m_yAxis = new QValueAxis();
+        m_yAxis->setLabelFormat("%.2f");
+        m_yAxis->setRange(0, 100); // Initial range, will be updated in updateData
+        chart->addAxis(m_yAxis, Qt::AlignLeft);
+
+        // Create the Y-axes and set the range
+        for (auto* series : m_series) {
+            series->attachAxis(m_yAxis);
+        }
 
         // Create the chart view and add it to the layout
-        QChartView* cpuChartView = new QChartView(cpuChart);
-        cpuChartView->setRenderHint(QPainter::Antialiasing);
-        return cpuChartView;
-    }
-
-    void updateData() {
-        // Update CPU chart
-        int cpuUsage = sysstats.getCpuUsage();
-        m_cpuSeries->append(QDateTime::currentDateTime().toMSecsSinceEpoch(), cpuUsage);
-        if (m_cpuSeries->count() > m_maxDataPoints) m_cpuSeries->remove(0);
-        qint64 cpuMaxX = QDateTime::currentDateTime().toMSecsSinceEpoch();
-        qint64 cpuMinX = cpuMaxX - m_xAxisRangeMs;
-        m_cpuXAxis->setRange(QDateTime::fromMSecsSinceEpoch(cpuMinX), QDateTime::fromMSecsSinceEpoch(cpuMaxX));
+        QChartView* chartView = new QChartView(chart);
+        chartView->setRenderHint(QPainter::Antialiasing);
+        return chartView;
     }
 
 public:
     int m_maxDataPoints = 600;
     qint64 m_xAxisRangeMs = 60000; // 1 minute
-    CpuUsageWidget(QWidget* parent = nullptr) : ContainerWidget(parent) { setWidget(createCpuChart()); }
-    void attachTo(QLambdaTimer& t){
-        t.addLambda([&](){updateData();});
+
+    ValueUsageWidget(std::function<std::vector<double>()> dataFunction, QString title, QList<QColor> colors, QWidget* parent = nullptr) :
+        ContainerWidget(parent), getDataFunction(std::move(dataFunction)), title(title) {
+        setWidget(createChart(colors));
+    }
+
+    ValueUsageWidget(std::function<std::vector<double>()> dataFunction, QString title, QWidget* parent = nullptr) :
+        ValueUsageWidget(dataFunction, title, QList<QColor>{}, parent) {}
+
+    void attachTo(QLambdaTimer& t) {
+        t.addLambda([&]() { updateData(); });
+    }
+
+    void updateData() {
+        // Update chart
+        std::vector<double> usages = getDataFunction();
+
+        double minThreshold = m_yAxis->max() * 0.70;
+        double maxThreshold = m_yAxis->max();
+        double maxDataPoint = 0;
+
+        for (size_t i = 0; i < usages.size(); i++) {
+            m_series[i]->append(QDateTime::currentDateTime().toMSecsSinceEpoch(), usages[i]);
+        }
+
+        for (size_t i = 0; i < m_series.size(); i++) {
+            // Remove data points that exceed the maximum
+            if (m_series[i]->count() > m_maxDataPoints) m_series[i]->remove(0);
+            for (const QPointF& point : m_series[i]->points()) {
+                maxDataPoint = std::max(maxDataPoint, point.y());
+            }
+        }
+
+        if(maxDataPoint > maxThreshold){
+            m_yAxis->setRange(0, maxDataPoint);
+        }else if(maxDataPoint < 1.0){
+            m_yAxis->setRange(0, 1.0);
+        }else if(maxDataPoint < minThreshold){
+            m_yAxis->setRange(0, maxDataPoint * 1.25);
+        }
+
+        // Adjust X-axis range
+        qint64 maxX = QDateTime::currentDateTime().toMSecsSinceEpoch();
+        qint64 minX = maxX - m_xAxisRangeMs;
+        m_xAxis->setRange(QDateTime::fromMSecsSinceEpoch(minX), QDateTime::fromMSecsSinceEpoch(maxX));
     }
 };
 
-class MemoryUsageWidget : public ContainerWidget {
+class PercentUsageWidget : public ContainerWidget {
 private:
-    SystemStats sysstats;
-    QLineSeries* m_memorySeries;
-    QDateTimeAxis* m_memoryXAxis;
-    QWidget* createMemoryChart() {
-        // Create the line series for the memory usage data
-        m_memorySeries = new QLineSeries();
+    std::function<int()> getDataFunction;
+    QString title;
+    QLineSeries* m_series;
+    QDateTimeAxis* m_xAxis;
+
+    QWidget* createChart() {
+        // Create the line series for the usage data
+        m_series = new QLineSeries();
 
         // Create the chart and add the line series to it
-        SystemThemedChart* memoryChart = new SystemThemedChart();
-        memoryChart->legend()->hide();
-        memoryChart->addLineSeriesWithArea(m_memorySeries);
-        memoryChart->setTitle("Memory Usage");
+        SystemThemedChart* chart = new SystemThemedChart();
+        chart->legend()->hide();
+        chart->addLineSeriesWithArea(m_series);
+        chart->setTitle(title);
 
         // Create the X-axis and set it to a time axis
-        m_memoryXAxis = new QDateTimeAxis();
-        m_memoryXAxis->setTickCount(10);
-        m_memoryXAxis->setFormat("hh:mm:ss");
-        m_memoryXAxis->setLabelsVisible(false);
-        memoryChart->addAxis(m_memoryXAxis, Qt::AlignBottom);
-        m_memorySeries->attachAxis(m_memoryXAxis);
+        m_xAxis = new QDateTimeAxis();
+        m_xAxis->setTickCount(10);
+        m_xAxis->setFormat("hh:mm:ss");
+        m_xAxis->setLabelsVisible(false);
+        chart->addAxis(m_xAxis, Qt::AlignBottom);
+        m_series->attachAxis(m_xAxis);
 
         // Create the Y-axis and set the range
-        QValueAxis* memoryYAxis = new QValueAxis();
-        memoryYAxis->setLabelFormat("%.0f%%");
-        memoryYAxis->setRange(0, 100);
-        memoryChart->addAxis(memoryYAxis, Qt::AlignLeft);
-        m_memorySeries->attachAxis(memoryYAxis);
+        QValueAxis* yAxis = new QValueAxis();
+        yAxis->setLabelFormat("%.0f%%");
+        yAxis->setRange(0, 100);
+        chart->addAxis(yAxis, Qt::AlignLeft);
+        m_series->attachAxis(yAxis);
 
-        // Create the chart view and return it
-        QChartView* memoryChartView = new QChartView(memoryChart);
-        memoryChartView->setRenderHint(QPainter::Antialiasing);
-        return memoryChartView;
+        // Create the chart view and add it to the layout
+        QChartView* chartView = new QChartView(chart);
+        chartView->setRenderHint(QPainter::Antialiasing);
+        return chartView;
     }
 
     void updateData() {
-        int memoryUsage = sysstats.getMemoryUsage();
-        m_memorySeries->append(QDateTime::currentDateTime().toMSecsSinceEpoch(), memoryUsage);
-        if (m_memorySeries->count() > m_maxDataPoints) m_memorySeries->remove(0);
-        qint64 memoryMaxX = QDateTime::currentDateTime().toMSecsSinceEpoch();
-        qint64 memoryMinX = memoryMaxX - m_xAxisRangeMs;
-        m_memoryXAxis->setRange(QDateTime::fromMSecsSinceEpoch(memoryMinX), QDateTime::fromMSecsSinceEpoch(memoryMaxX));
+        // Update chart
+        int usage = getDataFunction();
+        m_series->append(QDateTime::currentDateTime().toMSecsSinceEpoch(), usage);
+        if (m_series->count() > m_maxDataPoints) m_series->remove(0);
+        qint64 maxX = QDateTime::currentDateTime().toMSecsSinceEpoch();
+        qint64 minX = maxX - m_xAxisRangeMs;
+        m_xAxis->setRange(QDateTime::fromMSecsSinceEpoch(minX), QDateTime::fromMSecsSinceEpoch(maxX));
     }
 
 public:
     int m_maxDataPoints = 600;
     qint64 m_xAxisRangeMs = 60000; // 1 minute
-    MemoryUsageWidget(QWidget* parent = nullptr) : ContainerWidget(parent) { setWidget(createMemoryChart()); }
-    void attachTo(QLambdaTimer& t){
-        t.addLambda([&](){updateData();});
+    PercentUsageWidget(std::function<int()> getDataFunction, QString title, QWidget* parent = nullptr) :
+        ContainerWidget(parent), getDataFunction(getDataFunction), title(title) {
+        setWidget(createChart());
+    }
+    void attachTo(QLambdaTimer& t) {
+        t.addLambda([&]() { updateData(); });
     }
 };
 
-class OverviewWidget : public EQLayoutWidget<QVBoxLayout>
-{
-    private:
-    MemoryUsageWidget* mem = new MemoryUsageWidget();
-    CpuUsageWidget* cpu = new CpuUsageWidget();
+class CpuUsageWidget : public PercentUsageWidget {
+private:
+    SystemStats sysstats;
+
 public:
-    OverviewWidget(QWidget *parent = nullptr) : EQLayoutWidget(parent)
-    {
+    CpuUsageWidget(QWidget* parent = nullptr) :
+        PercentUsageWidget([&]() { return sysstats.getCpuUsage(); }, "CPU Usage", parent) {}
+};
+
+class MemoryUsageWidget : public PercentUsageWidget {
+private:
+    SystemStats sysstats;
+
+public:
+    MemoryUsageWidget(QWidget* parent = nullptr) :
+        PercentUsageWidget([&]() { return sysstats.getMemoryUsage(); }, "Memory Usage", parent) {}
+};
+
+class MemoryValueWidget : public ValueUsageWidget {
+private:
+    SystemStats sysstats;
+
+public:
+    MemoryValueWidget(QWidget* parent = nullptr) :
+        ValueUsageWidget([&]() { return std::vector<double>{(double)sysstats.getMemoryUsage()}; }, "Memory Usage", parent) {}
+};
+
+class OverviewWidget : public EQLayoutWidget<QVBoxLayout> {
+private:
+    MemoryValueWidget* mem = new MemoryValueWidget();
+    CpuUsageWidget* cpu = new CpuUsageWidget();
+
+public:
+    OverviewWidget(QWidget* parent = nullptr) : EQLayoutWidget(parent) {
         setAutoFillBackground(true);
         layout->setSpacing(0);
         layout->addWidget(cpu);
         layout->addWidget(mem);
     }
-    void attachTo(QLambdaTimer& t){
+    void attachTo(QLambdaTimer& t) {
         cpu->attachTo(t);
         mem->attachTo(t);
     }
